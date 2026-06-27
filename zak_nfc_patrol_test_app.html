@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZAK NFC Patrol Test App</title>
+  <style>
+    :root {
+      --bg: #0f0f10;
+      --card: #1d1d1f;
+      --card2: #26262a;
+      --border: #3a3a3d;
+      --text: #f5f5f7;
+      --muted: #b8b8bd;
+      --green: #32d74b;
+      --blue: #0a84ff;
+      --red: #ff453a;
+      --yellow: #ffd60a;
+      --orange: #ff9f0a;
+    }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap {
+      max-width: 800px;
+      margin: auto;
+      padding: 14px;
+      padding-bottom: 80px;
+    }
+    h1 { font-size: 24px; margin: 10px 0 4px; }
+    h2 { font-size: 21px; margin: 0 0 12px; }
+    h3 { font-size: 17px; margin: 14px 0 6px; }
+    .small { color: var(--muted); font-size: 14px; line-height: 1.35; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-top: 14px;
+    }
+    .subcard {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 10px;
+    }
+    button {
+      width: 100%;
+      padding: 15px;
+      margin: 7px 0;
+      border: none;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: bold;
+    }
+    .btn-green { background: var(--green); color: #000; }
+    .btn-blue { background: var(--blue); color: #fff; }
+    .btn-red { background: var(--red); color: #fff; }
+    .btn-yellow { background: var(--yellow); color: #000; }
+    .btn-orange { background: var(--orange); color: #000; }
+    .btn-gray { background: #555; color: #fff; }
+    input, textarea, select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 13px;
+      margin: 6px 0 10px;
+      border-radius: 10px;
+      border: 1px solid #555;
+      background: #050505;
+      color: #fff;
+      font-size: 16px;
+    }
+    textarea { min-height: 82px; }
+    label { display: block; font-size: 14px; color: var(--muted); margin-top: 6px; }
+    .status {
+      padding: 12px;
+      border-radius: 10px;
+      background: #111;
+      border: 1px solid #333;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 28px;
+    }
+    .good { color: var(--green); font-weight: bold; }
+    .bad { color: var(--red); font-weight: bold; }
+    .warn { color: var(--yellow); font-weight: bold; }
+    .pill {
+      display: inline-block;
+      padding: 5px 9px;
+      margin: 3px 3px 3px 0;
+      border-radius: 999px;
+      background: #333;
+      color: #fff;
+      font-size: 13px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      padding: 8px 0;
+      z-index: 5;
+    }
+    .tabs button {
+      font-size: 13px;
+      padding: 10px 5px;
+      margin: 0;
+      background: #2a2a2d;
+      color: #fff;
+    }
+    .hidden { display: none; }
+    .logItem {
+      border-bottom: 1px solid #3a3a3d;
+      padding: 10px 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .bigState {
+      font-size: 20px;
+      font-weight: bold;
+      padding: 12px;
+      border-radius: 12px;
+      background: #111;
+      border: 1px solid #333;
+      text-align: center;
+    }
+    .progress {
+      height: 12px;
+      background: #111;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid #333;
+      margin: 8px 0;
+    }
+    .bar {
+      height: 100%;
+      width: 0%;
+      background: var(--green);
+      transition: width .25s;
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ZAK NFC Patrol Test App</h1>
+  <div class="small">For Android Chrome + HTTPS + NTAG215/NDEF tags. Logs are stored locally in this browser for testing.</div>
+
+  <div class="tabs">
+    <button onclick="showSection('scanSec')">Scan</button>
+    <button onclick="showSection('writeSec')">Write</button>
+    <button onclick="showSection('loginSec')">Login/Shift</button>
+    <button onclick="showSection('logsSec')">Logs</button>
+    <button onclick="showSection('toolsSec')">Tools</button>
+    <button onclick="showSection('helpSec')">Help</button>
+  </div>
+
+  <section id="scanSec" class="card">
+    <h2>1. NFC Scan / Read</h2>
+    <div id="support" class="status">Checking support...</div>
+    <button class="btn-green" onclick="startScanOnly()">Start NFC Scan</button>
+    <div id="scanStatus" class="status">No scan yet.</div>
+  </section>
+
+  <section id="writeSec" class="card hidden">
+    <h2>2. Write NTAG215 Test Data</h2>
+    <div class="small">
+      This writes NDEF records. NTAG215 can store about 504 bytes usable memory, so keep test data short.
+    </div>
+
+    <label>Write Mode</label>
+    <select id="writeMode" onchange="updateWriteForm()">
+      <option value="patrol">Patrol Stop JSON</option>
+      <option value="text">Plain Text ID</option>
+      <option value="url">Website URL</option>
+      <option value="contact">Contact Card Text</option>
+      <option value="wifi">Wi-Fi Info Text</option>
+      <option value="multi">Multi Record Test</option>
+    </select>
+
+    <div id="patrolForm">
+      <label>Site Name</label>
+      <input id="siteName" value="Madera Library">
+      <label>Stop Name</label>
+      <input id="stopName" value="Front Door">
+      <label>Custom Tag ID</label>
+      <input id="tagId" value="ZAK-STOP-001">
+      <label>Officer / Test User</label>
+      <input id="officerName" value="Test Officer">
+    </div>
+
+    <div id="textForm" class="hidden">
+      <label>Text to write</label>
+      <textarea id="plainText">ZAK-STOP-001</textarea>
+    </div>
+
+    <div id="urlForm" class="hidden">
+      <label>URL to write</label>
+      <input id="urlText" value="https://app.zaksecurity.com/">
+    </div>
+
+    <div id="contactForm" class="hidden">
+      <label>Name</label>
+      <input id="contactName" value="ZAK Security Office">
+      <label>Phone</label>
+      <input id="contactPhone" value="559-000-0000">
+      <label>Email</label>
+      <input id="contactEmail" value="office@zaksecurity.com">
+    </div>
+
+    <div id="wifiForm" class="hidden">
+      <label>Wi-Fi SSID</label>
+      <input id="wifiSsid" value="TestWiFi">
+      <label>Wi-Fi Password</label>
+      <input id="wifiPass" value="TestPassword123">
+      <div class="small">Web NFC will write this as readable text/JSON for testing, not as a guaranteed Android Wi-Fi auto-connect payload.</div>
+    </div>
+
+    <div id="multiForm" class="hidden">
+      <label>Record 1 Text</label>
+      <input id="multi1" value="ZAK-STOP-001">
+      <label>Record 2 Text</label>
+      <input id="multi2" value="Madera Library - Front Door">
+      <label>Record 3 URL</label>
+      <input id="multi3" value="https://app.zaksecurity.com/">
+    </div>
+
+    <button class="btn-blue" onclick="writeSelectedTag()">Write Selected Data To NFC Tag</button>
+    <div class="progress"><div id="writeBar" class="bar"></div></div>
+    <div id="writeStatus" class="status">Waiting to write.</div>
+  </section>
+
+  <section id="loginSec" class="card hidden">
+    <h2>3. Mock Login + Clock In / Clock Out</h2>
+
+    <div class="subcard">
+      <h3>Mock Login</h3>
+      <label>Username</label>
+      <input id="loginUser" value="test.officer">
+      <label>PIN</label>
+      <input id="loginPin" type="password" value="1234">
+      <button class="btn-green" onclick="mockLogin()">Login</button>
+      <button class="btn-red" onclick="mockLogout()">Logout</button>
+      <div id="loginStatus" class="bigState">Not logged in</div>
+    </div>
+
+    <div class="subcard">
+      <h3>Shift Controls</h3>
+      <label>Shift Site</label>
+      <input id="shiftSite" value="Madera Library">
+      <button class="btn-yellow" onclick="clockIn()">Clock In</button>
+      <button class="btn-orange" onclick="clockOut()">Clock Out</button>
+      <div id="shiftStatus" class="bigState">Not clocked in</div>
+    </div>
+
+    <div class="subcard">
+      <h3>NFC Patrol Stop Check-In</h3>
+      <div class="small">Use this after logging in and clocking in. It scans the tag and records a patrol stop log.</div>
+      <button class="btn-green" onclick="scanPatrolStop()">Scan Tag For Patrol Stop</button>
+      <div id="patrolStatus" class="status">No patrol stop scanned yet.</div>
+    </div>
+  </section>
+
+  <section id="logsSec" class="card hidden">
+    <h2>4. Local Web App Logs</h2>
+    <div class="row">
+      <button class="btn-gray" onclick="exportLogs()">Export Logs</button>
+      <button class="btn-red" onclick="clearLogs()">Clear Logs</button>
+    </div>
+    <textarea id="exportBox" placeholder="Exported logs will appear here."></textarea>
+    <div id="logList"></div>
+  </section>
+
+  <section id="toolsSec" class="card hidden">
+    <h2>5. Test Tools</h2>
+    <button class="btn-blue" onclick="simulateTag()">Simulate NFC Tag Scan</button>
+    <button class="btn-gray" onclick="seedDemo()">Add Demo Logs</button>
+    <div id="toolStatus" class="status">Tools ready.</div>
+  </section>
+
+  <section id="helpSec" class="card hidden">
+    <h2>6. What This Tests</h2>
+    <div class="subcard">
+      <span class="pill">Text ID</span>
+      <span class="pill">URL</span>
+      <span class="pill">JSON Patrol Stop</span>
+      <span class="pill">Contact Text</span>
+      <span class="pill">Wi-Fi Text</span>
+      <span class="pill">Clock In/Out</span>
+      <span class="pill">Local Logs</span>
+    </div>
+    <div class="small">
+      Web NFC can read/write NDEF records from Chrome on Android. It is good for testing patrol tags, location IDs, URLs, and simple text/JSON records.
+      It is not the same as a full Android APK. A real APK can access NFC more deeply and can handle background tag detection better.
+    </div>
+  </section>
+</div>
+
+<script>
+let activeScanAbort = null;
+
+function $(id) { return document.getElementById(id); }
+function now() { return new Date().toLocaleString(); }
+function isoNow() { return new Date().toISOString(); }
+
+function showSection(id) {
+  ["scanSec","writeSec","loginSec","logsSec","toolsSec","helpSec"].forEach(x => $(x).classList.add("hidden"));
+  $(id).classList.remove("hidden");
+  renderState();
+}
+
+function checkSupport() {
+  let msg = "";
+  if ("NDEFReader" in window) {
+    msg += "✅ Web NFC available.\n";
+  } else {
+    msg += "❌ Web NFC not available. Use Android Chrome.\n";
+  }
+  msg += "Page protocol: " + location.protocol + "\n";
+  if (location.protocol === "https:") {
+    msg += "✅ HTTPS secure origin detected.";
+  } else {
+    msg += "❌ Must be hosted on HTTPS for real NFC scanning.";
+  }
+  $("support").textContent = msg;
+}
+
+function safeJsonParse(text) {
+  try { return JSON.parse(text); } catch(e) { return null; }
+}
+
+function decodeRecord(record) {
+  try {
+    const decoder = new TextDecoder(record.encoding || "utf-8");
+    if (!record.data) return "";
+    return decoder.decode(record.data);
+  } catch (e) {
+    return "[decode failed: " + e + "]";
+  }
+}
+
+function describeNfcEvent(event) {
+  let dataPieces = [];
+  let output = "Time: " + now() + "\n";
+  output += "Browser Serial Number: " + (event.serialNumber || "Not provided") + "\n\n";
+
+  event.message.records.forEach((record, index) => {
+    const data = decodeRecord(record);
+    dataPieces.push(data);
+    output += "Record " + (index + 1) + "\n";
+    output += "Type: " + record.recordType + "\n";
+    output += "Media: " + (record.mediaType || "none") + "\n";
+    output += "Data:\n" + data + "\n\n";
+  });
+
+  return { output, dataPieces };
+}
+
+async function startNfcRead(statusElement, onRead) {
+  if (!("NDEFReader" in window)) {
+    statusElement.textContent = "Web NFC is not supported. Use Android Chrome.";
+    return;
+  }
+  try {
+    const ndef = new NDEFReader();
+    statusElement.textContent = "NFC scanner is active.\nTouch the tag to the back of the phone now.";
+
+    await ndef.scan();
+
+    ndef.onreadingerror = () => {
+      statusElement.textContent = "Read error. Try again, or rewrite the tag as NDEF text.";
+    };
+
+    ndef.onreading = event => {
+      const result = describeNfcEvent(event);
+      onRead(event, result);
+    };
+  } catch (error) {
+    statusElement.textContent = "Scan failed:\n" + error;
+  }
+}
+
+function startScanOnly() {
+  startNfcRead($("scanStatus"), (event, result) => {
+    $("scanStatus").textContent = result.output;
+    addLog("NFC_READ", {
+      serialNumber: event.serialNumber || null,
+      data: result.dataPieces,
+      rawText: result.output
+    });
+  });
+}
+
+function updateWriteForm() {
+  ["patrolForm","textForm","urlForm","contactForm","wifiForm","multiForm"].forEach(x => $(x).classList.add("hidden"));
+  const mode = $("writeMode").value;
+  if (mode === "patrol") $("patrolForm").classList.remove("hidden");
+  if (mode === "text") $("textForm").classList.remove("hidden");
+  if (mode === "url") $("urlForm").classList.remove("hidden");
+  if (mode === "contact") $("contactForm").classList.remove("hidden");
+  if (mode === "wifi") $("wifiForm").classList.remove("hidden");
+  if (mode === "multi") $("multiForm").classList.remove("hidden");
+}
+
+function buildWriteRecords() {
+  const mode = $("writeMode").value;
+
+  if (mode === "patrol") {
+    const payload = {
+      app: "ZAK_PATROL_TEST",
+      type: "patrol_stop",
+      tagId: $("tagId").value.trim(),
+      site: $("siteName").value.trim(),
+      stop: $("stopName").value.trim(),
+      officer: $("officerName").value.trim(),
+      version: 1
+    };
+    return {
+      description: JSON.stringify(payload, null, 2),
+      records: [{ recordType: "mime", mediaType: "application/json", data: JSON.stringify(payload) }]
+    };
+  }
+
+  if (mode === "text") {
+    return {
+      description: $("plainText").value,
+      records: [{ recordType: "text", data: $("plainText").value }]
+    };
+  }
+
+  if (mode === "url") {
+    return {
+      description: $("urlText").value,
+      records: [{ recordType: "url", data: $("urlText").value }]
+    };
+  }
+
+  if (mode === "contact") {
+    const text = [
+      "CONTACT TEST",
+      "Name: " + $("contactName").value,
+      "Phone: " + $("contactPhone").value,
+      "Email: " + $("contactEmail").value
+    ].join("\n");
+    return {
+      description: text,
+      records: [{ recordType: "text", data: text }]
+    };
+  }
+
+  if (mode === "wifi") {
+    const payload = {
+      type: "wifi_test",
+      ssid: $("wifiSsid").value,
+      password: $("wifiPass").value,
+      note: "This is Web NFC test data, not guaranteed Android auto-connect Wi-Fi setup."
+    };
+    return {
+      description: JSON.stringify(payload, null, 2),
+      records: [{ recordType: "mime", mediaType: "application/json", data: JSON.stringify(payload) }]
+    };
+  }
+
+  if (mode === "multi") {
+    return {
+      description: $("multi1").value + "\n" + $("multi2").value + "\n" + $("multi3").value,
+      records: [
+        { recordType: "text", data: $("multi1").value },
+        { recordType: "text", data: $("multi2").value },
+        { recordType: "url", data: $("multi3").value }
+      ]
+    };
+  }
+}
+
+function setWriteProgress(percent, text) {
+  $("writeBar").style.width = percent + "%";
+  $("writeStatus").textContent = text;
+}
+
+async function writeSelectedTag() {
+  if (!("NDEFReader" in window)) {
+    setWriteProgress(0, "Web NFC is not supported. Use Android Chrome.");
+    return;
+  }
+
+  const built = buildWriteRecords();
+  setWriteProgress(10, "Preparing NDEF payload...\n\n" + built.description);
+
+  try {
+    const ndef = new NDEFReader();
+
+    setWriteProgress(35, "NFC writer is ready.\nHold the NTAG215 tag against the back of the phone and keep it still.");
+    await new Promise(r => setTimeout(r, 500));
+
+    setWriteProgress(60, "Writing now...\nDo not move the tag.");
+    await ndef.write({ records: built.records });
+
+    setWriteProgress(100, "✅ WRITE COMPLETE\n\nWrote:\n" + built.description + "\n\nNow go to Scan and read the tag back.");
+    addLog("NFC_WRITE", {
+      mode: $("writeMode").value,
+      written: built.description
+    });
+  } catch (error) {
+    setWriteProgress(0, "❌ Write failed:\n" + error + "\n\nTry holding the tag longer and flatter against the back of the phone.");
+    addLog("NFC_WRITE_FAILED", { error: String(error) });
+  }
+}
+
+function mockLogin() {
+  const user = $("loginUser").value.trim();
+  const pin = $("loginPin").value.trim();
+
+  if (!user || !pin) {
+    $("loginStatus").textContent = "Enter username and PIN.";
+    return;
+  }
+
+  localStorage.setItem("zakUser", JSON.stringify({ user, loginTime: isoNow() }));
+  $("loginStatus").textContent = "Logged in as " + user;
+  addLog("LOGIN", { user });
+  renderState();
+}
+
+function mockLogout() {
+  const user = getUser();
+  localStorage.removeItem("zakUser");
+  localStorage.removeItem("zakShift");
+  $("loginStatus").textContent = "Not logged in";
+  $("shiftStatus").textContent = "Not clocked in";
+  addLog("LOGOUT", { user: user ? user.user : null });
+  renderState();
+}
+
+function getUser() {
+  return JSON.parse(localStorage.getItem("zakUser") || "null");
+}
+
+function getShift() {
+  return JSON.parse(localStorage.getItem("zakShift") || "null");
+}
+
+function clockIn() {
+  const user = getUser();
+  if (!user) {
+    $("shiftStatus").textContent = "Login first.";
+    return;
+  }
+
+  const shift = {
+    user: user.user,
+    site: $("shiftSite").value.trim(),
+    clockIn: isoNow(),
+    clockOut: null
+  };
+  localStorage.setItem("zakShift", JSON.stringify(shift));
+  $("shiftStatus").textContent = "Clocked in\n" + shift.site + "\n" + now();
+  addLog("CLOCK_IN", shift);
+  renderState();
+}
+
+function clockOut() {
+  const shift = getShift();
+  if (!shift) {
+    $("shiftStatus").textContent = "You are not clocked in.";
+    return;
+  }
+
+  shift.clockOut = isoNow();
+  localStorage.removeItem("zakShift");
+  $("shiftStatus").textContent = "Clocked out\n" + now();
+  addLog("CLOCK_OUT", shift);
+  renderState();
+}
+
+function scanPatrolStop() {
+  const user = getUser();
+  const shift = getShift();
+
+  if (!user) {
+    $("patrolStatus").textContent = "Login first.";
+    return;
+  }
+  if (!shift) {
+    $("patrolStatus").textContent = "Clock in first.";
+    return;
+  }
+
+  startNfcRead($("patrolStatus"), (event, result) => {
+    let tagPayload = null;
+    for (const piece of result.dataPieces) {
+      const parsed = safeJsonParse(piece);
+      if (parsed) tagPayload = parsed;
+    }
+
+    const patrolLog = {
+      user: user.user,
+      shiftSite: shift.site,
+      scannedAt: isoNow(),
+      browserSerialNumber: event.serialNumber || null,
+      tagData: result.dataPieces,
+      parsedTag: tagPayload
+    };
+
+    $("patrolStatus").textContent =
+      "✅ Patrol stop recorded\n\n" +
+      "Officer: " + user.user + "\n" +
+      "Shift Site: " + shift.site + "\n" +
+      "Time: " + now() + "\n\n" +
+      result.output;
+
+    addLog("PATROL_STOP_SCAN", patrolLog);
+    renderLogs();
+  });
+}
+
+function addLog(type, data) {
+  const logs = JSON.parse(localStorage.getItem("zakLogs") || "[]");
+  logs.unshift({
+    type,
+    time: now(),
+    isoTime: isoNow(),
+    data
+  });
+  localStorage.setItem("zakLogs", JSON.stringify(logs.slice(0, 250)));
+  renderLogs();
+}
+
+function renderState() {
+  const user = getUser();
+  const shift = getShift();
+
+  $("loginStatus").textContent = user ? ("Logged in as " + user.user) : "Not logged in";
+  $("shiftStatus").textContent = shift ? ("Clocked in\n" + shift.site + "\n" + new Date(shift.clockIn).toLocaleString()) : "Not clocked in";
+
+  renderLogs();
+}
+
+function renderLogs() {
+  const logs = JSON.parse(localStorage.getItem("zakLogs") || "[]");
+  if (!logs.length) {
+    $("logList").innerHTML = '<div class="small">No logs yet.</div>';
+    return;
+  }
+
+  $("logList").innerHTML = logs.map(log => {
+    return `<div class="logItem"><b>${escapeHtml(log.type)}</b> — ${escapeHtml(log.time)}\n${escapeHtml(JSON.stringify(log.data, null, 2))}</div>`;
+  }).join("");
+}
+
+function exportLogs() {
+  const logs = JSON.parse(localStorage.getItem("zakLogs") || "[]");
+  $("exportBox").value = JSON.stringify(logs, null, 2);
+}
+
+function clearLogs() {
+  if (!confirm("Clear all local test logs?")) return;
+  localStorage.removeItem("zakLogs");
+  renderLogs();
+  $("exportBox").value = "";
+}
+
+function simulateTag() {
+  const fake = {
+    app: "ZAK_PATROL_TEST",
+    type: "patrol_stop",
+    tagId: "ZAK-STOP-001",
+    site: "Madera Library",
+    stop: "Front Door",
+    officer: "Test Officer",
+    version: 1
+  };
+  $("toolStatus").textContent = "Simulated tag:\n" + JSON.stringify(fake, null, 2);
+  addLog("SIMULATED_TAG_SCAN", fake);
+}
+
+function seedDemo() {
+  addLog("LOGIN", { user: "test.officer" });
+  addLog("CLOCK_IN", { user: "test.officer", site: "Madera Library" });
+  addLog("PATROL_STOP_SCAN", { tagId: "ZAK-STOP-001", site: "Madera Library", stop: "Front Door" });
+  addLog("CLOCK_OUT", { user: "test.officer", site: "Madera Library" });
+  $("toolStatus").textContent = "Demo logs added.";
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, m => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+  }[m]));
+}
+
+checkSupport();
+updateWriteForm();
+renderState();
+</script>
+</body>
+</html>
