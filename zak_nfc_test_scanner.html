@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZAK NFC Test Scanner</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #111;
+      color: #fff;
+    }
+    .wrap {
+      max-width: 720px;
+      margin: auto;
+      padding: 18px;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 4px;
+    }
+    .card {
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 14px;
+      padding: 16px;
+      margin-top: 14px;
+    }
+    button {
+      width: 100%;
+      padding: 16px;
+      margin: 8px 0;
+      border: none;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .scan { background: #32d74b; color: #000; }
+    .write { background: #0a84ff; color: #fff; }
+    .clear { background: #ff453a; color: #fff; }
+    input, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 14px;
+      margin: 8px 0;
+      border-radius: 10px;
+      border: 1px solid #444;
+      background: #000;
+      color: #fff;
+      font-size: 16px;
+    }
+    .status {
+      padding: 12px;
+      border-radius: 10px;
+      background: #222;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .good { color: #32d74b; }
+    .bad { color: #ff453a; }
+    .small {
+      color: #bbb;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+    .historyItem {
+      border-bottom: 1px solid #333;
+      padding: 10px 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>ZAK NFC Test Scanner</h1>
+    <div class="small">
+      Works on Android Chrome with NDEF-compatible NFC tags. This is for testing how NFC scanning works from a web page.
+    </div>
+
+    <div class="card">
+      <h2>Status</h2>
+      <div id="support" class="status">Checking NFC support...</div>
+      <button class="scan" onclick="startScan()">Start NFC Scan</button>
+      <button class="clear" onclick="clearHistory()">Clear History</button>
+      <div class="small">
+        After pressing Start NFC Scan, hold the NFC tag against the back of your phone.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Last Scan</h2>
+      <div id="lastScan" class="status">No scan yet.</div>
+    </div>
+
+    <div class="card">
+      <h2>Write Test Tag</h2>
+      <div class="small">
+        Optional: write your own patrol/location ID to a blank writable tag, then scan it.
+      </div>
+      <input id="writeText" value="ZAK-STOP-001" />
+      <button class="write" onclick="writeTag()">Write This Text To NFC Tag</button>
+    </div>
+
+    <div class="card">
+      <h2>Scan History</h2>
+      <div id="history"></div>
+    </div>
+  </div>
+
+<script>
+const supportBox = document.getElementById("support");
+const lastScanBox = document.getElementById("lastScan");
+const historyBox = document.getElementById("history");
+
+function nowText() {
+  return new Date().toLocaleString();
+}
+
+function setSupport() {
+  if ("NDEFReader" in window) {
+    supportBox.innerHTML = '<span class="good">Web NFC is available.</span>\nUse Chrome on Android. NFC must be turned on.';
+  } else {
+    supportBox.innerHTML = '<span class="bad">Web NFC is NOT available in this browser.</span>\nTry Android Chrome. This will not work in most in-app browsers.';
+  }
+
+  if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+    supportBox.innerHTML += '\n\n<span class="bad">Important:</span> This page must be opened from HTTPS, not plain HTTP or a local file.';
+  }
+}
+
+function decodeRecord(record) {
+  try {
+    if (record.recordType === "text") {
+      const decoder = new TextDecoder(record.encoding || "utf-8");
+      return decoder.decode(record.data);
+    }
+
+    if (record.recordType === "url" || record.recordType === "absolute-url") {
+      const decoder = new TextDecoder();
+      return decoder.decode(record.data);
+    }
+
+    if (record.mediaType && record.mediaType.includes("json")) {
+      const decoder = new TextDecoder();
+      return decoder.decode(record.data);
+    }
+
+    if (record.data) {
+      const decoder = new TextDecoder();
+      return decoder.decode(record.data);
+    }
+
+    return "[Empty record]";
+  } catch (e) {
+    return "[Could not decode record: " + e + "]";
+  }
+}
+
+function saveHistory(item) {
+  const list = JSON.parse(localStorage.getItem("nfcHistory") || "[]");
+  list.unshift(item);
+  localStorage.setItem("nfcHistory", JSON.stringify(list.slice(0, 50)));
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = JSON.parse(localStorage.getItem("nfcHistory") || "[]");
+  if (!list.length) {
+    historyBox.innerHTML = '<div class="small">No history yet.</div>';
+    return;
+  }
+  historyBox.innerHTML = list.map(x =>
+    `<div class="historyItem"><b>${x.time}</b>\n${escapeHtml(x.text)}</div>`
+  ).join("");
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, m => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+  }[m]));
+}
+
+async function startScan() {
+  if (!("NDEFReader" in window)) {
+    alert("Web NFC is not supported in this browser. Use Android Chrome.");
+    return;
+  }
+
+  try {
+    const ndef = new NDEFReader();
+    await ndef.scan();
+
+    lastScanBox.textContent = "Scanning... touch an NFC tag to the back of the phone.";
+
+    ndef.onreadingerror = () => {
+      lastScanBox.textContent = "Tried to read the tag, but it failed. Try a different tag or rewrite it as NDEF text.";
+    };
+
+    ndef.onreading = event => {
+      let output = "";
+      output += "Time: " + nowText() + "\n";
+      output += "Serial Number: " + (event.serialNumber || "Not provided by browser") + "\n\n";
+
+      if (!event.message.records.length) {
+        output += "No NDEF records found.";
+      }
+
+      event.message.records.forEach((record, index) => {
+        output += "Record " + (index + 1) + "\n";
+        output += "Type: " + record.recordType + "\n";
+        output += "Media: " + (record.mediaType || "none") + "\n";
+        output += "Data: " + decodeRecord(record) + "\n\n";
+      });
+
+      lastScanBox.textContent = output;
+      saveHistory({ time: nowText(), text: output });
+    };
+  } catch (error) {
+    lastScanBox.textContent = "Scan failed:\n" + error;
+  }
+}
+
+async function writeTag() {
+  if (!("NDEFReader" in window)) {
+    alert("Web NFC is not supported in this browser. Use Android Chrome.");
+    return;
+  }
+
+  const text = document.getElementById("writeText").value.trim();
+  if (!text) {
+    alert("Enter text first.");
+    return;
+  }
+
+  try {
+    const ndef = new NDEFReader();
+    await ndef.write({
+      records: [{ recordType: "text", data: text }]
+    });
+    lastScanBox.textContent = "Wrote to tag:\n" + text + "\n\nNow press Start NFC Scan and scan it.";
+  } catch (error) {
+    lastScanBox.textContent = "Write failed:\n" + error;
+  }
+}
+
+function clearHistory() {
+  localStorage.removeItem("nfcHistory");
+  renderHistory();
+}
+
+setSupport();
+renderHistory();
+</script>
+</body>
+</html>
